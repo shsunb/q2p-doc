@@ -22,7 +22,6 @@
 ## 安装
 ```bash
 go get github.com/mosalut/q2p
-cd q2p
 ```
 
 
@@ -50,29 +49,44 @@ go mod tidy
 - `-remote_host`：指定远程节点的地址（可选）。
 
 ### 运行
+假使已知一个种子节点在127.0.0.1:10000启动
 
-启动一个 P2P 节点：
-
-```bash
-go run q2p_test.go -ip 127.0.0.1 -port 10001 -remote_host <remote_ip>:<remote_port>
 ```
+package main
 
-### 事件说明
+import (
+	"github.com/mosalut/q2p"
+	"log"
+)
 
-- `JOIN`：节点请求加入网络。
-- `TOUCHREQUEST`：节点请求与目标节点建立连接。
-- `TOUCH`：节点触发连接建立事件。
-- `TOUCHED`：目标节点响应连接请求。
-- `CONNECTREQUEST`：节点请求连接其他节点。
-- `CONNECT`：节点接受连接请求。
-- `CONNECTED`：连接成功建立。
-- `TRANSPORT`：节点进行数据传输。
-- `TRANSPORT_FAILED`：数据传输失败。
-- `TEST`：用于测试的事件。
+// 自定义回调函数
+func callback(data []byte) {
+	fmt.Println(string(data))
+}
+
+func main() {
+	seedAddrs = make(map[string]bool)
+	seedAddrs[127.0.0.1:10000] = false // 将已知种子节点放入seedAddrs
+
+        // 创建新节点
+	peer := q2p.NewPeer("127.0.0.1", "10001", seedAddrs, []byte{0x0, 0x0}, callback)
+	err := peer.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+```
+通过运行q2p.NewPeer(ip, port, seedAddrs, networkID, callback)函数来运行一个节点）
+
+参数ip、port是本节点要启动q2p网络主机所在的IP和端口组成的UDP地址
+参数seedAddrs是一个map,其中每一个key都是一个种子节点的UDP地址
+参数networkID是一个网络ID号，2个字节，这里使用0
+callback是用于收到TRANSPORT事件时的用户自定义函数，callback函数的参数data，是被TRANSPORT事件发来并处理的
+
 
 ### 数据传输
 
-数据传输通过 `Transport` 方法实现，该方法将数据分片并通过 UDP 进行发送，确保大数据量的可靠传输。如果数据传输失败，库会尝试重新传输。
+数据传输通过 `Transport` 方法实现，该方法将数据分片并通过 UDP 进行发送，确保大数据量的可靠传输。如果数据传输失败，用户可以决定是否尝试重新传输。
 
 ### 传输超时和失败处理
 
@@ -113,7 +127,9 @@ func main() {
 该项目提供了一些简单的单元测试，涵盖了 P2P 节点的基本运行和数据传输功能。你可以通过以下命令运行测试：
 
 ```bash
-go test -v
+go test -v -count 1 test.run TestQ2p . // 默认 host是127.0.0.1:10000
+
+go test -v -count 1 test.run TestTransport -remote_host 127.0.0.1:10000 -port 10001
 ```
 
 ### 测试文件
