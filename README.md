@@ -66,7 +66,7 @@ func callback(key string, data []byte) {
 }
 
 // 自定义transport失败时的回调函数
-func callbackFailed(key string, syns []uint32) {
+func callbackFailed(peer *q2p.Peer_T, rAddr *net.UDPAddr, key string, syns []uint32) { // rAddr为发送TRANSPORT_FAILED那一方节点的UDP地址，也是接收TRANSPORT事件的地址
 	fmt.Println(key) // key是失败的传输的hash
 	fmt.Println(syns []uint32) // 丢失的那些数据包的SYN
 }
