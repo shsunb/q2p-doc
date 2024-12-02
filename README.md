@@ -51,7 +51,7 @@ go mod tidy
 ### 运行
 假使已知一个种子节点在127.0.0.1:10000启动
 
-```
+```go
 package main
 
 import (

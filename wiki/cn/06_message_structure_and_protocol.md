@@ -41,7 +41,6 @@ header := make([]byte, 0, 10)
 binary.LittleEndian.PutUint16(header, peer.NetworkID)
 binary.LittleEndian.PutUint16(header, TRANSPORT)
 binary.LittleEndian.PutUint32(header, uint32(len(data)))
-checksum := calculateChecksum(data)
 binary.LittleEndian.PutUint16(header, checksum)
 ```
 
@@ -57,7 +56,7 @@ binary.LittleEndian.PutUint16(header, checksum)
 
 ### `JOIN` 事件
 
-`JOIN` 事件用于节点请求加入网络。当节点请求加入时，它会发送一个包含 `JOIN` 事件的数据包。
+节点请求加入网络。当当前节点收到来访节点的JOIN事件时，它作为种子节点，要求每个已连接的节点向新节点打洞。因此，当前节点会向每个已连接的节点发送TOUCHREQUEST消息，并将新节点作为数据参数传输。
 
 #### 数据包示例：
 
@@ -65,12 +64,10 @@ binary.LittleEndian.PutUint16(header, checksum)
 | ------------ | ---------------------- | ------------ |
 | `NetworkID`  | 网络标识符             | 2            |
 | `Event`      | 事件类型（JOIN）        | 2            |
-| `Data Length`| 数据部分的长度         | 4            |
-| `Data`       | 数据部分（加入请求信息）| 可变长度     |
 
-### `CONNECT` 事件
+### `TOUCHREQUEST` 事件
 
-`CONNECT` 事件用于节点之间的连接确认。当一个节点收到连接请求后，响应节点会返回 `CONNECT` 消息确认连接。
+节点请求建立连接时，此网络事件应由种子节点发出，数据为要TOUCH的节点的UDP地址。当当前节点收到该地址后，将开始向目标UDP地址打洞（发送TOUCH消息），并向种子节点发送TOUCHED网络消息，以表示本节点已按照种子节点的建议向目标节点打洞。这里的“touch”指的就是打洞。
 
 #### 数据包示例：
 
@@ -78,8 +75,67 @@ binary.LittleEndian.PutUint16(header, checksum)
 | ------------ | ---------------------- | ------------ |
 | `NetworkID`  | 网络标识符             | 2            |
 | `Event`      | 事件类型（CONNECT）     | 2            |
-| `Data Length`| 数据部分的长度         | 4            |
-| `Data`       | 数据部分（连接确认信息）| 可变长度     |
+| `Data`       | 数据部分（节点请求建立连接）|  -            |
+
+### `TOUCH` 事件
+
+该事件不一定会收到，因为首次访问新节点时是向外打洞的动作，旨在帮助新节点连接到当前节点。然而，这个首次访问可能会被对方节点的外层路由拦截。如果对方节点直接暴露在公网，则可以收到该事件，此时无需打洞。无论是否收到该网络事件，都不会产生实质性的动作，这仅仅是一个过程标志。
+
+#### 数据包示例：
+
+| 字段         | 描述                   | 长度（字节） |
+| ------------ | ---------------------- | ------------ |
+| `NetworkID`  | 网络标识符             | 2            |
+| `Event`      | 事件类型（CONNECT）     | 2            |
+| `Data`       | 数据部分               |  -            |
+
+### `TOUCHED` 事件
+
+当该节点收到TOUCHED网络事件时，说明作为种子节点的它被告知打洞节点已向目标节点打过洞。收到TOUCHED消息后，该种子节点将向打洞目标节点发送CONNECTREQUEST消息，请求其连接打洞节点。
+
+#### 数据包示例：
+
+| 字段         | 描述                   | 长度（字节） |
+| ------------ | ---------------------- | ------------ |
+| `NetworkID`  | 网络标识符             | 2            |
+| `Event`      | 事件类型（CONNECT）     | 2            |
+| `Data`       | 数据部分（打洞完成消息）| -             |
+
+### `CONNECTREQUEST` 事件
+
+当该节点收到网络事件时，说明种子节点已知当前节点被打洞，打洞节点通过TOUCH操作已向其开启端口。因此，当前节点被告知可以连接打洞节点。收到该事件后，当前节点应向打洞节点发送CONNECT消息以建立连接。
+
+#### 数据包示例：
+
+| 字段         | 描述                   | 长度（字节） |
+| ------------ | ---------------------- | ------------ |
+| `NetworkID`  | 网络标识符             | 2            |
+| `Event`      | 事件类型（CONNECT）     | 2            |
+| `Data`       | 数据部分（连接打洞节点信息）| -             |
+
+### `CONNECT` 事件
+
+当该节点作为打洞节点接收到目标节点的连接请求时，它会回复目标节点一个CONNECTED消息，并将该目标节点加入已连接列表。
+
+#### 数据包示例：
+
+| 字段         | 描述                   | 长度（字节） |
+| ------------ | ---------------------- | ------------ |
+| `NetworkID`  | 网络标识符             | 2            |
+| `Event`      | 事件类型（CONNECT）     | 2            |
+| `Data`       | 数据部分（连接确认信息）| -             |
+
+### `CONNECTED` 事件
+
+收到CONNECTED消息后，该节点将对方节点加入已连接列表。
+
+#### 数据包示例：
+
+| 字段         | 描述                   | 长度（字节） |
+| ------------ | ---------------------- | ------------ |
+| `NetworkID`  | 网络标识符             | 2            |
+| `Event`      | 事件类型（CONNECT）     | 2            |
+| `Data`       | 数据部分（连接确认信息）| -             |
 
 ### `TRANSPORT` 事件
 
@@ -91,8 +147,14 @@ binary.LittleEndian.PutUint16(header, checksum)
 | ------------ | ---------------------- | ------------ |
 | `NetworkID`  | 网络标识符             | 2            |
 | `Event`      | 事件类型（TRANSPORT）   | 2            |
-| `Data Length`| 数据部分的长度         | 4            |
 | `Data`       | 数据部分（文件内容或消息）| 可变长度     |
+
+Data内部结构：
+| 字段         | 描述                   | 长度（字节） |
+| ------------ | ---------------------- | ------------ |
+| `hash`  | HASH             | 0th ~ 16th bytes          |
+| `length`      | Data总长度   | 16th ~ 20nd bytes            |
+| `syn`       | placeholder for each SYN| 20nd ~ 24th bytes     |
 
 ### `TRANSPORT_FAILED` 事件
 
@@ -104,8 +166,14 @@ binary.LittleEndian.PutUint16(header, checksum)
 | ------------ | ---------------------- | ------------ |
 | `NetworkID`  | 网络标识符             | 2            |
 | `Event`      | 事件类型（TRANSPORT_FAILED） | 2        |
-| `Data Length`| 数据部分的长度         | 4            |
 | `Data`       | 数据部分（失败的包信息）| 可变长度     |
+
+Data内部结构：
+| 字段         | 描述                   | 长度（字节） |
+| ------------ | ---------------------- | ------------ |
+| ``  |     1         | 0th ~ 16th bytes          |
+| ``      |  2  | 16th ~ 20nd bytes            |
+| ``       | 3| 20nd ~ 24th bytes     |
 
 ---
 
