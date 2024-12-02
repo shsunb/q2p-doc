@@ -60,8 +60,15 @@ import (
 )
 
 // 自定义回调函数
-func callback(data []byte) {
+func callback(key string, data []byte) {
+	fmt.Println(key) // key是本次传输的hash
 	fmt.Println(string(data))
+}
+
+// 自定义transport失败时的回调函数
+func callbackFailed(key string, syns []uint32) {
+	fmt.Println(key) // key是失败的传输的hash
+	fmt.Println(syns []uint32) // 丢失的那些数据包的SYN
 }
 
 func main() {
@@ -69,18 +76,20 @@ func main() {
 	seedAddrs[127.0.0.1:10000] = false // 将已知种子节点放入seedAddrs
 
         // 创建新节点
-	peer := q2p.NewPeer("127.0.0.1", "10001", seedAddrs, []byte{0x0, 0x0}, callback)
+	peer := q2p.NewPeer("127.0.0.1", 10001, seedAddrs, []byte{0x0, 0x0}, callback, callbackFailed)
 	err := peer.Run()
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 ```
-通过运行q2p.NewPeer(ip, port, seedAddrs, networkID, callback)函数来运行一个节点）
+通过运行q2p.NewPeer(ip, port, seedAddrs, networkID, timeSendLost, timeout, callback, callbackFunc)函数来运行一个节点）
 
 参数ip、port是本节点要启动q2p网络主机所在的IP和端口组成的UDP地址
 参数seedAddrs是一个map,其中每一个key都是一个种子节点的UDP地址
 参数networkID是一个网络ID号，2个字节，这里使用0
+参数timeSendLost, 是一个秒为单位的时间, 用来设置多久时间数据没收完，算丢包，可以根据此时间，通知发送节点重发丢失的数据包
+参数timeout，是一个秒为单位的时间，用来设置多久时间数据没有收完算超时，并通知发送节点本次传输超时结束
 callback是用于收到TRANSPORT事件时的用户自定义函数，callback函数的参数data，是被TRANSPORT事件发来并处理的
 
 
@@ -106,19 +115,56 @@ import (
 	"github.com/mosalut/q2p"
 )
 
+var transmissionCache = make(map[string][]byte)
+
+func callback(key string, data []byte) {
+	fmt.Println("Transmission hash:", key)
+	fmt.Println("Received data:", string(data))
+}
+
+func callbackFailed(peer *q2p.Peer_T, rAddr *net.UDPAddr, key string, syns []uint32) {
+	if len(syns) == 0 {
+		fmt.Println("transmission Failed, hash:", key)
+		return
+	}
+
+	data := transmissionCache[key]
+
+	var start int
+	var end int
+	for _, v := range syns {
+		start = v * q2p.PACKET_LEN
+		if start + q2p.PACKET_LEN > len(data) {
+			end = len(data)
+		} else {
+			end = start + q2p.PACKET_LEN
+		}
+
+		fmt.Println("lost SYN:", v, "data:", data[start:end])
+
+		err := peer.TransportAPacket(rAddr, key, syn, data[start:end])
+		if err != nil {
+			log.Println(err)
+		}
+	}
+}
+
 func main() {
-	peer := q2p.NewPeer("127.0.0.1", 10000, nil, 0, func(data []byte) {
-		fmt.Println("Received data:", string(data))
-	})
+	peer := q2p.NewPeer("127.0.0.1", 10000, nil, 0, callback, callbackFailed)
 
 	err := peer.Run()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// 发送数据
+	// transport data
 	remoteAddr, _ := net.ResolveUDPAddr("udp", "127.0.0.1:10001")
-	peer.Transport(remoteAddr, []byte("Hello, P2P Network"))
+	data := []byte("Hello, P2P Network")
+	key, err := !peer.Transport(remoteAddr, data)
+	if err != nil {
+		log.Fatal(err)
+	}
+	transmissionCache[key] = data
 }
 ```
 
