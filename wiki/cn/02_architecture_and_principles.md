@@ -47,18 +47,17 @@
 
 ### 事件与回调
 
-`Q2P` 中的事件分为不同的类型，每个事件都可以触发相应的回调。以下是一些常见的事件类型及其说明：
+`Q2P` 中的事件分为不同的类型，每个事件都可以触发相应的回调。以下是所有事件类型：
 
-- **JOIN**：节点请求加入网络。
-- **TOUCHREQUEST**：节点请求与目标节点建立连接。
-- **TOUCH**：节点触发连接建立事件。
-- **TOUCHED**：目标节点响应连接请求。
-- **CONNECTREQUEST**：节点请求连接其他节点。
-- **CONNECT**：节点接受连接请求。
-- **CONNECTED**：连接成功建立。
-- **TRANSPORT**：节点进行数据传输。
-- **TRANSPORT_FAILED**：数据传输失败。
-- **TEST**：用于测试的事件。
+- **JOIN**
+- **TOUCHREQUEST**
+- **TOUCH**
+- **TOUCHED**
+- **CONNECTREQUEST**
+- **CONNECT**
+- **CONNECTED**
+- **TRANSPORT**
+- **TRANSPORT_FAILED**
 
 ### 数据包结构
 
