@@ -76,6 +76,15 @@ func main() {
 	seedAddrs[127.0.0.1:10000] = false // 将已知种子节点放入seedAddrs
 
         // 创建新节点
+	// 参数列表:
+	//	ip string	节点启动的地址 默认为 0.0.0.0
+	// 	port int	节点启动的端口 默认为 10000
+	// 	rAddrs map[string]bool	种子节点列表 默认为空
+	// 	networkID uint16	版本号
+	// 	timeSendAgain	接收方隔多久检查一次是否有丢包 如果有丢包会告知发送方
+	// 	timeout int	接收方等到完整数据的超时时间 如果超时会告知发送方
+	// 	callback func(string, []byte)	接收到完整数据时执行的回调函数
+	// 	callbackFailed func(*Peer_T, *net.UDPAddr, string, []uint32) 接收到失败时的回调函数 如果最后一个参数的长度为0 表示超时 否则代表掉包所在的SYN位置
 	peer := q2p.NewPeer("127.0.0.1", 10001, seedAddrs, []byte{0x0, 0x0}, callback, callbackFailed)
 	err := peer.Run()
 	if err != nil {
