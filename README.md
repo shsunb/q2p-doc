@@ -18,35 +18,12 @@
 
 - Go 1.22
 
-
-## 安装
+### 安装依赖
 ```bash
 go get github.com/mosalut/q2p
 ```
 
-
-### 克隆代码
-
-```bash
-git clone https://github.com/mosalut/q2p.git
-cd q2p
-```
-
-### 安装依赖
-
-```bash
-go mod tidy
-```
-
 ## 快速上手
-
-### 配置
-
-你可以通过以下命令行参数来配置并启动一个 P2P 节点：
-
-- `-ip`：指定本地节点的 IP 地址，默认为 `0.0.0.0`。
-- `-port`：指定本地节点的端口，默认为 `10000`。
-- `-remote_host`：指定远程节点的地址（可选）。
 
 ### 运行
 假使已知一个种子节点在127.0.0.1:10000启动
@@ -59,13 +36,23 @@ import (
 	"log"
 )
 
-// 自定义回调函数
-func callback(key string, data []byte) {
+/* 自定义回调函数
+	peer *Peer_T	// 当前peer
+	rAddr *net.UDPAddr	// 发送方地址
+	key string	// Transmission HASH
+	data []byte	// 接收到的完整数据
+*/
+func callback(peer *Peer_T, rAddr *net.UDPAddr, key string, data []byte) {
 	fmt.Println(key) // key是本次传输的hash
 	fmt.Println(string(data))
 }
 
-// 自定义transport失败时的回调函数
+/* 自定义transport失败时的回调函数
+	peer *Peer_T	// 当前peer
+	rAddr *net.UDPAddr	// 发送方地址
+	key string	// Transmission HASH
+	syns []uint32	// 丢包的SYN位置列表
+*/
 func callbackFailed(peer *q2p.Peer_T, rAddr *net.UDPAddr, key string, syns []uint32) { // rAddr为发送TRANSPORT_FAILED那一方节点的UDP地址，也是接收TRANSPORT事件的地址
 	fmt.Println(key) // key是失败的传输的hash
 	fmt.Println(syns []uint32) // 丢失的那些数据包的SYN
@@ -77,14 +64,14 @@ func main() {
 
         // 创建新节点
 	// 参数列表:
-	//	ip string	节点启动的地址 默认为 0.0.0.0
-	// 	port int	节点启动的端口 默认为 10000
+	//	ip string	节点启动的主机地址 默认为 0.0.0.0
+	// 	port int	节点启动的主机端口 默认为 10000
 	// 	rAddrs map[string]bool	种子节点列表 默认为空
 	// 	networkID uint16	版本号
 	// 	timeSendAgain	接收方隔多久检查一次是否有丢包 如果有丢包会告知发送方
 	// 	timeout int	接收方等到完整数据的超时时间 如果超时会告知发送方
-	// 	callback func(string, []byte)	接收到完整数据时执行的回调函数
-	// 	callbackFailed func(*Peer_T, *net.UDPAddr, string, []uint32) 接收到失败时的回调函数 如果最后一个参数的长度为0 表示超时 否则代表掉包所在的SYN位置
+	// 	callback func(*Peer_T, *net.UDPAddr, string, []byte)	接收到完整数据时执行的回调函数
+	// 	callbackFailed func(*Peer_T, *net.UDPAddr, string, []uint32) 接收到失败时的回调函数 如果最后一个参数的长度为0 表示超时 否则代表丢包所在的SYN位置
 	peer := q2p.NewPeer("127.0.0.1", 10001, seedAddrs, []byte{0x0, 0x0}, callback, callbackFailed)
 	err := peer.Run()
 	if err != nil {
@@ -94,13 +81,13 @@ func main() {
 ```
 通过运行q2p.NewPeer(ip, port, seedAddrs, networkID, timeSendLost, timeout, callback, callbackFunc)函数来运行一个节点）
 
-参数ip、port是本节点要启动q2p网络主机所在的IP和端口组成的UDP地址
-参数seedAddrs是一个map,其中每一个key都是一个种子节点的UDP地址
-参数networkID是一个网络ID号，2个字节，这里使用0
-参数timeSendLost, 是一个秒为单位的时间, 用来设置多久时间数据没收完，算丢包，可以根据此时间，通知发送节点重发丢失的数据包
-参数timeout，是一个秒为单位的时间，用来设置多久时间数据没有收完算超时，并通知发送节点本次传输超时结束
-callback是用于收到TRANSPORT事件时的用户自定义函数，callback函数的参数data，是被TRANSPORT事件发来并处理的
-
+参数 ip、port 是本节点要启动q2p网络主机所在的IP和端口组成的UDP地址
+参数 seedAddrs 是一个map,其中每一个key都是一个种子节点的UDP地址
+参数 networkID 是一个网络ID号，2个字节，这里使用0
+参数 timeSendLost 是一个秒为单位的时间, 用来设置多久时间数据没收完，算丢包，可以根据此时间，通知发送节点重发丢失的数据包
+参数 timeout 是一个秒为单位的时间，用来设置多久时间数据没有收完算超时，并通知发送节点本次传输超时结束
+参数 callback 是用于收到TRANSPORT事件时的用户自定义函数，callback函数的参数data，是被TRANSPORT事件发来并处理的
+参数 callbackFailed 接收到失败时的回调函数
 
 ### 数据传输
 
@@ -126,7 +113,7 @@ import (
 
 var transmissionCache = make(map[string][]byte)
 
-func callback(key string, data []byte) {
+func callback(peer *Peer_T, rAddr *net.UDPAddr, key string, data []byte) {
 	fmt.Println("Transmission hash:", key)
 	fmt.Println("Received data:", string(data))
 }
@@ -182,9 +169,9 @@ func main() {
 该项目提供了一些简单的单元测试，涵盖了 P2P 节点的基本运行和数据传输功能。你可以通过以下命令运行测试：
 
 ```bash
-go test -v -count 1 test.run TestQ2p . // 默认 host是127.0.0.1:10000
-
+go test -v -count 1 test.run TestQ2p 或 go test -v -count 1 test.run TestTransport // 启动最初的种子节点 默认 host是127.0.0.1:10000
 go test -v -count 1 test.run TestTransport -remote_host 127.0.0.1:10000 -port 10001
+go test -v -count 1 test.run TestTransport -remote_host 127.0.0.1:10000 -port 10002
 ```
 
 ### 测试文件
@@ -192,6 +179,8 @@ go test -v -count 1 test.run TestTransport -remote_host 127.0.0.1:10000 -port 10
 - `q2p_test.go` 文件包含了用于测试节点连接、事件处理和数据传输的示例。
 
 ### 事件传输测试
+
+`TestQ2p` 测试函数主要体现了协议层的测试
 
 `TestTransport` 测试函数模拟了数据传输的全过程，包括数据的发送和接收，验证了数据分片传输和超时控制机制。
 
