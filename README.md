@@ -67,7 +67,7 @@ func main() {
 	//	ip string	节点启动的主机地址 默认为 0.0.0.0
 	// 	port int	节点启动的主机端口 默认为 10000
 	// 	rAddrs map[string]bool	种子节点列表 默认为空
-	// 	networkID uint16	版本号
+	// 	networkID uint16	网络号 与其他Q2P网络隔离
 	// 	timeSendAgain	接收方隔多久检查一次是否有丢包 如果有丢包会告知发送方
 	// 	timeout int	接收方等到完整数据的超时时间 如果超时会告知发送方
 	// 	callback func(*Peer_T, *net.UDPAddr, string, []byte)	接收到完整数据时执行的回调函数
